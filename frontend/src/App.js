@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export default function App() {
   const [fuel, setFuel] = useState("Petrol");
@@ -9,41 +9,49 @@ export default function App() {
   const [cars, setCars] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // 🔥 AUTO FETCH (production style debounce)
+  // 🌐 API BASE URL (change in production)
+  const API = "http://localhost:8080";
+
+  // 🚀 FETCH CARS (optimized + safe)
+  const fetchCars = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API}/api/cars/shortlist?fuel=${encodeURIComponent(
+          fuel
+        )}&budget=${budget}&mileage=${mileage}&safety=${safety}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch cars");
+      }
+
+      const data = await response.json();
+      setCars(data);
+    } catch (error) {
+      console.error(error);
+      setCars([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [fuel, budget, mileage, safety]);
+
+  // 🔥 AUTO FETCH WITH DEBOUNCE
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchCars();
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [fuel, budget, mileage, safety]);
-
-  const fetchCars = async () => {
-    setLoading(true);
-
-    try {
-      const res = await fetch(
-        `http://localhost:8080/api/cars/shortlist?fuel=${fuel}&budget=${budget}&mileage=${mileage}&safety=${safety}`
-      );
-      const data = await res.json();
-      setCars(data);
-    } catch (err) {
-      console.error(err);
-    }
-
-    setLoading(false);
-  };
+  }, [fetchCars]);
 
   return (
     <div style={styles.page}>
-
-      {/* LEFT CONTROL PANEL */}
+      {/* LEFT PANEL */}
       <div style={styles.left}>
-
         <h1 style={styles.title}>🚗 Car Decision AI</h1>
-        <p style={styles.sub}>
-          Find your perfect car in seconds
-        </p>
+        <p style={styles.sub}>Find your perfect car in seconds</p>
 
         {/* FUEL */}
         <div style={styles.card}>
@@ -101,7 +109,7 @@ export default function App() {
           />
         </div>
 
-        {/* BEST MATCH SUMMARY */}
+        {/* BEST MATCH */}
         {cars.length > 0 && (
           <div style={styles.best}>
             🏆 Best Match: {cars[0].name}
@@ -109,25 +117,31 @@ export default function App() {
         )}
       </div>
 
-      {/* RIGHT RESULTS PANEL */}
+      {/* RIGHT PANEL */}
       <div style={styles.right}>
-        <h2 style={{ marginBottom: 15 }}>Top Shortlist</h2>
+        <h2>Top Shortlist</h2>
+
+        {/* RESULT COUNT */}
+        {cars.length > 0 && (
+          <p style={{ opacity: 0.7 }}>
+            {cars.length} car{cars.length !== 1 ? "s" : ""} found
+          </p>
+        )}
 
         {/* LOADING */}
         {loading && (
-          <>
-            <Skeleton />
-            <Skeleton />
-            <Skeleton />
-          </>
+          <div style={{ opacity: 0.7, marginTop: 10 }}>
+            🔍 Finding best cars for you...
+          </div>
         )}
 
         {/* EMPTY STATE */}
         {!loading && cars.length === 0 && (
           <div style={styles.empty}>
-            🚫 No cars matched your preferences
-            <br />
-            <small>Try increasing budget or relaxing filters</small>
+            <h3>🚫 No matches found</h3>
+            <p>
+              Try increasing budget or relaxing safety/mileage filters.
+            </p>
           </div>
         )}
 
@@ -138,30 +152,26 @@ export default function App() {
               key={i}
               style={{
                 ...styles.cardResult,
-                border: i === 0 ? "2px solid gold" : "1px solid #2a2a2a"
+                border:
+                  i === 0
+                    ? "2px solid gold"
+                    : "1px solid rgba(255,255,255,0.1)"
               }}
             >
               <div style={styles.row}>
-                <h3>
-                  🚗 {car.name}
-                </h3>
+                <h3>🚗 {car.name}</h3>
 
-                {i === 0 && (
-                  <span style={styles.badge}>BEST</span>
-                )}
+                {i === 0 && <span style={styles.badge}>BEST</span>}
               </div>
 
               <div style={styles.meta}>
-                💰 ₹{car.price.toLocaleString()} | ⛽ {car.mileage} km/l | 🛡 {car.safety}/5
+                💰 ₹{car.price.toLocaleString()} | ⛽ {car.mileage} km/l | 🛡{" "}
+                {car.safety}/5
               </div>
 
-              <div style={styles.score}>
-                Score: {car.score}
-              </div>
+              <div style={styles.score}>⭐ Score: {car.score}</div>
 
-              <p style={styles.reason}>
-                💡 {car.reason}
-              </p>
+              <p style={styles.reason}>💡 {car.reason}</p>
             </div>
           ))}
       </div>
@@ -169,20 +179,9 @@ export default function App() {
   );
 }
 
-/* ================= UI COMPONENTS ================= */
-
-const Skeleton = () => (
-  <div style={styles.skeleton}>
-    <div style={styles.skelLine}></div>
-    <div style={styles.skelLine}></div>
-    <div style={styles.skelLine}></div>
-  </div>
-);
-
 /* ================= STYLES ================= */
 
 const styles = {
-
   page: {
     display: "flex",
     height: "100vh",
@@ -283,20 +282,7 @@ const styles = {
     border: "1px dashed gray",
     borderRadius: 10,
     textAlign: "center",
-    opacity: 0.7
-  },
-
-  skeleton: {
-    background: "rgba(255,255,255,0.05)",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10
-  },
-
-  skelLine: {
-    height: 10,
-    background: "rgba(255,255,255,0.1)",
-    marginBottom: 8,
-    borderRadius: 5
+    opacity: 0.7,
+    marginTop: 20
   }
 };
